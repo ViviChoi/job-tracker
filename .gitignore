@@ -1,0 +1,11 @@
+config.json
+resume.pdf
+data/
+__pycache__/
+*.pyc
+*.db
+*.log
+.env
+.venv/
+venv/
+.DS_Store

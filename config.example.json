@@ -1,0 +1,96 @@
+{
+  "search": {
+    "location_mode": "manual",
+    "locations": [
+      {
+        "name": "城市名称",
+        "city": "City",
+        "country": "Country",
+        "location": "City, Country",
+        "enabled": true,
+        "radius_km": 30,
+        "keywords": ["关键词1", "Keyword2"],
+        "keyword_aliases": {},
+        "user_prompt": "描述你想找的职位类型和不感兴趣的方向",
+        "blacklist": {
+          "companies": [],
+          "keywords": []
+        }
+      }
+    ],
+    "hours_old": 24,
+    "interval_minutes": 60,
+    "retry": {
+      "max_attempts": 3,
+      "retry_interval_minutes": 5,
+      "pause_on_failure_minutes": 60
+    },
+    "blacklist": {
+      "companies": [],
+      "keywords": []
+    }
+  },
+  "matching": {
+    "mode": "ai",
+    "min_score": 70,
+    "resume_file": "resume.pdf",
+    "ai": {
+      "provider": "claude",
+      "api_key": "YOUR_CLAUDE_API_KEY",
+      "model": "",
+      "user_prompt": "填写你的求职偏好，例如：薪资待遇、工作方式等"
+    }
+  },
+  "resume_generator": {
+    "enabled": true,
+    "description": "将匹配职位输出给简历生成器",
+    "output": {
+      "mode": "file",
+      "file_path": "data/matched_jobs/",
+      "webhook_url": ""
+    }
+  },
+  "storage": {
+    "mode": "local",
+    "local_path": "data/jobs.db",
+    "google_sheets": {
+      "enabled": false,
+      "sheets_id": "",
+      "credentials_file": "credentials.json"
+    }
+  },
+  "notification": {
+    "mode": "scheduled",
+    "scheduled_times": ["17:00"],
+    "timezone": "auto",
+    "channels": {
+      "telegram": {
+        "enabled": true,
+        "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+        "chat_id": "YOUR_TELEGRAM_CHAT_ID"
+      },
+      "email": {
+        "enabled": false,
+        "smtp_host": "",
+        "smtp_port": 587,
+        "username": "",
+        "password": "",
+        "to": ""
+      }
+    },
+    "quiet_hours": {
+      "enabled": false,
+      "start": "23:00",
+      "end": "07:00",
+      "timezone": "auto",
+      "hold_and_send": true
+    }
+  },
+  "alias_learning": {
+    "enabled": true,
+    "provider": "claude",
+    "api_key": "YOUR_CLAUDE_API_KEY",
+    "model": "",
+    "refresh_days": 7
+  }
+}

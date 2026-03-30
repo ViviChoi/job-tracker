@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Tracker 配置</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; }
+    .header { background: #1d1d1f; color: #fff; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .version { font-size: 12px; color: #888; }
+    .tracker-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+    .status-dot.running { background: #34c759; box-shadow: 0 0 0 3px rgba(52,199,89,.25); animation: pulse 2s infinite; }
+    .status-dot.stopped { background: #555; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(52,199,89,.25); } 50% { box-shadow: 0 0 0 5px rgba(52,199,89,.1); } }
+    .btn-danger { background: #ff3b30; color: #fff; }
+    .btn-danger:hover { background: #e0352b; }
+    .container { max-width: 860px; margin: 32px auto; padding: 0 24px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #e5e5ea; border-radius: 10px; padding: 4px; }
+    .tab { flex: 1; padding: 8px 12px; border: none; background: none; border-radius: 8px; cursor: pointer; font-size: 13px; color: #555; transition: all 0.2s; }
+    .tab.active { background: #fff; color: #1d1d1f; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #333; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+    .field input[type="text"], .field input[type="number"], .field input[type="password"],
+    .field input[type="email"], .field select, .field textarea {
+      width: 100%; padding: 9px 12px; border: 1px solid #d1d1d6; border-radius: 8px;
+      font-size: 14px; color: #1d1d1f; background: #fafafa; transition: border 0.2s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none; border-color: #0071e3; background: #fff;
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field .hint { font-size: 11px; color: #888; margin-top: 4px; }
+    .field .warning { font-size: 11px; color: #ff9500; margin-top: 4px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+    .toggle-row label { font-size: 13px; color: #555; font-weight: 500; }
+    .toggle { position: relative; width: 44px; height: 24px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider { position: absolute; inset: 0; background: #d1d1d6; border-radius: 24px; cursor: pointer; transition: 0.2s; }
+    .toggle input:checked + .slider { background: #34c759; }
+    .toggle .slider:before { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: white; border-radius: 50%; transition: 0.2s; }
+    .toggle input:checked + .slider:before { transform: translateX(20px); }
+    .tag-input-container { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 1px solid #d1d1d6; border-radius: 8px; background: #fafafa; min-height: 42px; cursor: text; }
+    .tag { display: flex; align-items: center; gap: 4px; background: #0071e3; color: #fff; padding: 3px 8px; border-radius: 20px; font-size: 12px; }
+    .tag button { background: none; border: none; color: #fff; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+    .tag-input { border: none; outline: none; background: none; font-size: 13px; min-width: 80px; flex: 1; }
+    /* Aliases editor */
+    .alias-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f9f9fb; border-radius: 8px; border: 1px solid #e5e5ea; }
+    .alias-kw { font-size: 13px; font-weight: 600; color: #0071e3; min-width: 120px; padding-top: 2px; }
+    .alias-tags { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+    .alias-tag { display: flex; align-items: center; gap: 4px; background: #e8f4fd; color: #0071e3; padding: 3px 10px; border-radius: 20px; font-size: 12px; }
+    .alias-tag button { background: none; border: none; color: #0071e3; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; opacity: .6; }
+    .alias-tag button:hover { opacity: 1; }
+    .alias-add { display: flex; gap: 6px; margin-top: 4px; width: 100%; }
+    .alias-input { flex: 1; padding: 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; font-size: 12px; }
+    .alias-btn { padding: 4px 10px; background: #0071e3; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .times-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .time-tag { display: flex; align-items: center; gap: 4px; background: #f0f0f5; padding: 4px 10px; border-radius: 20px; font-size: 13px; }
+    .time-tag button { background: none; border: none; cursor: pointer; color: #888; font-size: 14px; }
+    .time-add-row { display: flex; gap: 8px; }
+    .time-add-row input { flex: 1; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+    .btn-primary { background: #0071e3; color: #fff; }
+    .btn-primary:hover { background: #0077ed; }
+    .btn-success { background: #34c759; color: #fff; }
+    .btn-success:hover { background: #30b350; }
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+    .actions { display: flex; gap: 12px; margin-top: 24px; }
+    .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .alert-success { background: #d1fae5; color: #065f46; }
+    .alert-warning { background: #fef3c7; color: #92400e; }
+    .alert-error { background: #fee2e2; color: #991b1b; }
+    .upload-area { border: 2px dashed #d1d1d6; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: border 0.2s; }
+    .upload-area:hover { border-color: #0071e3; }
+    .upload-area p { font-size: 13px; color: #888; margin-top: 8px; }
+    .radio-group { display: flex; gap: 16px; }
+    .radio-option { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #555; }
+    .section-divider { border: none; border-top: 1px solid #f0f0f5; margin: 16px 0; }
+    /* Location cards */
+    .loc-card { background: #fff; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; border-left: 4px solid #0071e3; }
+    .loc-card-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; background: #f9f9fb; border-bottom: 1px solid #f0f0f5; }
+    .loc-card-body { padding: 18px 20px; }
+    .loc-index-badge { width: 22px; height: 22px; color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .loc-name-input { border: none; background: none; font-size: 14px; font-weight: 600; color: #1d1d1f; outline: none; min-width: 80px; max-width: 200px; }
+    .loc-name-input:focus { background: #f0f0f5; border-radius: 5px; padding: 2px 6px; }
+    .add-loc-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border: 2px dashed #d1d1d6; border-radius: 10px; background: none; cursor: pointer; font-size: 13px; color: #555; width: 100%; transition: all 0.2s; margin-top: 4px; }
+    .add-loc-btn:hover { border-color: #0071e3; color: #0071e3; background: #f0f5ff; }
+    .loc-kw-badge { font-size: 11px; color: #86868b; background: #f0f0f5; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+    .loc-alias-toggle { font-size: 12px; color: #0071e3; cursor: pointer; user-select: none; }
+    .loc-disabled { opacity: 0.5; }
+    .loc-input { width: 100%; }
+    .loc-input.error { border-color: #ff3b30 !important; background: #fff5f5 !important; }
+    .loc-error { font-size: 11px; color: #ff3b30; margin-top: 3px; min-height: 14px; }
+    /* Jobs tab */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 13px; background: #fff; }
+    .filter-bar .btn-icon { padding: 7px 12px; font-size: 12px; }
+    .job-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .job-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #e5e5ea; color: #888; font-weight: 600; font-size: 12px; cursor: pointer; user-select: none; white-space: nowrap; }
+    .job-table th:hover { color: #0071e3; }
+    .job-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f5; vertical-align: middle; }
+    .job-table tr:hover td { background: #fafafa; }
+    .job-table tr.starred td { background: #fffbeb; }
+    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+    .status-new { background: #e0f2fe; color: #0369a1; }
+    .status-applied { background: #dcfce7; color: #166534; }
+    .status-not_applied { background: #f1f5f9; color: #64748b; }
+    .job-actions { display: flex; gap: 6px; }
+    .icon-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
+    .icon-btn:hover { background: #f0f0f5; }
+    .notes-input { width: 100%; padding: 4px 8px; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 12px; }
+    .export-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .export-bar select, .export-bar input { padding: 7px 10px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 13px; }
+    .tab-switcher { display: flex; gap: 4px; margin-bottom: 16px; }
+    .sub-tab { padding: 6px 16px; border: 1px solid #d1d1d6; background: #fff; border-radius: 20px; cursor: pointer; font-size: 12px; color: #555; }
+    .sub-tab.active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .empty-state { text-align: center; padding: 48px; color: #aaa; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Job Tracker</h1>
+    <div style="font-size:12px;color:#86868b;margin-top:2px">自动爬取 · AI 匹配 · 实时推送</div>
+  </div>
+  <div class="tracker-status">
+    <span class="status-dot stopped" id="status-dot"></span>
+    <span id="status-text" style="color:#aaa">检查中...</span>
+    <span class="version" style="margin-left:8px">配置中心</span>
+  </div>
+</div>
+
+<div class="container">
+  <div id="alert" class="alert"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('search')">搜索设置</button>
+    <button class="tab" onclick="switchTab('matching')">匹配设置</button>
+    <button class="tab" onclick="switchTab('storage')">存储设置</button>
+    <button class="tab" onclick="switchTab('notification')">通知设置</button>
+    <button class="tab" onclick="switchTab('alias')">别名学习</button>
+    <button class="tab" onclick="switchTab('resume')">简历上传</button>
+    <button class="tab" onclick="switchTab('jobs')">职位列表</button>
+  </div>
+
+  <!-- 搜索设置 -->
+  <div id="panel-search" class="panel active">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <h2 style="margin:0">搜索地点 &amp; 关键词</h2>
+        <span style="font-size:12px;color:#86868b">每个地点独立配置搜索岗位</span>
+      </div>
+      <p style="font-size:12px;color:#86868b;margin-bottom:16px;line-height:1.6">例：只在德国找电气工程师，只在米兰找金融咨询岗位 — 互不干扰</p>
+      <div id="locations-list"></div>
+      <button class="add-loc-btn" onclick="addLocation()">＋ 添加搜索地点</button>
+    </div>
+
+    <div class="card">
+      <h2>黑名单过滤</h2>
+      <div class="field">
+        <label>屏蔽公司（回车添加）</label>
+        <div class="tag-input-container" id="blacklist-companies-container" onclick="document.getElementById('blacklist-companies-input').focus()">
+          <input type="text" class="tag-input" id="blacklist-companies-input" placeholder="输入公司名后按回车">
+        </div>
+      </div>
+      <div class="field">
+        <label>屏蔽关键词（出现在职位标题中则过滤）</label>
+        <div class="tag-input-container" id="blacklist-keywords-container" onclick="document.getElementById('blacklist-keywords-input').focus()">
+          <input type="text" class="tag-input" id="blacklist-keywords-input" placeholder="如 intern / unpaid">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>抓取频率与时间</h2>
+      <div class="row">
+        <div class="field">
+          <label>只看最近几小时内发布</label>
+          <input type="number" id="hours_old" value="24" min="1" max="720">
+        </div>
+        <div class="field">
+          <label>抓取间隔（分钟）</label>
+          <input type="number" id="interval_minutes" value="60" min="10">
+          <div id="interval-warning" class="warning" style="display:none">
+            ⚠️ 间隔低于 30 分钟可能触发 LinkedIn 限制，建议设置 30 分钟以上
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>失败重试次数</label>
+          <input type="number" id="retry_max_attempts" value="3" min="1" max="10">
+        </div>
+        <div class="field">
+          <label>重试间隔（分钟）</label>
+          <input type="number" id="retry_interval_minutes" value="5" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>连续失败后暂停（分钟）</label>
+        <input type="number" id="pause_on_failure_minutes" value="60" min="10">
+      </div>
+    </div>
+  </div>
+
+  <!-- 匹配设置 -->
+  <div id="panel-matching" class="panel">
+    <div class="card">
+      <h2>匹配模式</h2>
+      <div class="field">
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="matching_mode" value="keywords" checked> 关键词打分
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="matching_mode" value="ai"> AI 判断
+          </label>
+        </div>
+      </div>
+
+      <div id="keyword-options">
+        <div class="field">
+          <label>最低匹配分数（0-100）</label>
+          <input type="number" id="min_score" value="70" min="0" max="100">
+          <div class="hint">只推送达到此分数的职位</div>
+        </div>
+      </div>
+
+      <div id="ai-options" style="display:none">
+        <div class="field">
+          <label>AI Provider</label>
+          <select id="ai_provider">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" id="ai_api_key" placeholder="填入对应 Provider 的 API Key">
+        </div>
+        <div class="field">
+          <label>模型（留空使用默认）</label>
+          <input type="text" id="ai_model" placeholder="如 claude-haiku-4-5-20251001 / gpt-4o-mini">
+        </div>
+        <div class="field">
+          <label>你的求职要求描述</label>
+          <textarea id="ai_user_prompt" placeholder="用自然语言描述你的情况和要求，如：我是做了3年的前端开发，想转全栈，优先远程职位，不考虑外包公司，薪资15k以下不看"></textarea>
+          <div class="hint">AI 会根据这段描述判断每个职位是否推送给你</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 存储设置 -->
+  <div id="panel-storage" class="panel">
+    <div class="card">
+      <h2>本地存储</h2>
+      <div class="field">
+        <label>数据库路径</label>
+        <input type="text" id="local_path" value="~/.job-tracker/jobs.db">
+        <div class="hint">职位数据和去重记录保存在此，建议保持默认</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>简历定制生成器接口 <span style="font-size:11px;color:#888;font-weight:400">— 将匹配职位实时输出给外部程序</span></h2>
+      <div class="toggle-row">
+        <label>启用输出接口</label>
+        <label class="toggle">
+          <input type="checkbox" id="rg_enabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="rg-options" style="display:none; margin-top:16px">
+        <div class="field">
+          <label>输出方式</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="rg_mode" value="file" checked> 保存到本地文件
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="rg_mode" value="webhook"> HTTP Webhook
+            </label>
+          </div>
+          <div class="hint">输出内容：职位名、公司、地点、链接、完整 JD 描述。实时触发，不受定时推送影响。</div>
+        </div>
+        <div class="field" id="rg-file-field">
+          <label>输出目录</label>
+          <input type="text" id="rg_file_path" value="~/.job-tracker/matched_jobs/" placeholder="~/.job-tracker/matched_jobs/">
+          <div class="hint">每个匹配职位生成一个 JSON 文件，简历生成器监听此目录即可</div>
+        </div>
+        <div class="field" id="rg-webhook-field" style="display:none">
+          <label>Webhook URL</label>
+          <input type="text" id="rg_webhook_url" placeholder="http://your-server/api/generate-resume">
+          <div class="hint">匹配到职位时立即 POST 到此地址</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Google Sheets 同步（可选）</h2>
+      <div class="toggle-row">
+        <label>启用 Google Sheets 备份</label>
+        <label class="toggle">
+          <input type="checkbox" id="sheets_enabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="sheets-options" style="display:none; margin-top:16px">
+        <div class="field">
+          <label>Spreadsheet ID</label>
+          <input type="text" id="sheets_id" placeholder="从 Google Sheets URL 中获取">
+          <div class="hint">URL 格式：docs.google.com/spreadsheets/d/<b>这里是ID</b>/edit</div>
+        </div>
+        <div class="field">
+          <label>Service Account 凭证文件</label>
+          <input type="text" id="credentials_file" value="credentials.json">
+          <div class="hint">将 Google Cloud Service Account JSON 文件放到项目目录并填写文件名</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通知设置 -->
+  <div id="panel-notification" class="panel">
+    <div class="card">
+      <h2>推送时机</h2>
+      <div class="field">
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="notif_mode" value="realtime" checked> 实时推送
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="notif_mode" value="scheduled"> 定时推送
+          </label>
+        </div>
+      </div>
+      <div id="scheduled-times-options" style="display:none">
+        <div class="field">
+          <label>推送时间（可添加多个）</label>
+          <div class="times-list" id="times-list"></div>
+          <div class="time-add-row">
+            <input type="time" id="new-time-input">
+            <button class="btn btn-primary btn-sm" onclick="addTime()">添加</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>免打扰</h2>
+      <div class="toggle-row">
+        <label>启用免打扰时段</label>
+        <label class="toggle">
+          <input type="checkbox" id="quiet_enabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="quiet-options" style="display:none; margin-top:16px">
+        <div class="row">
+          <div class="field">
+            <label>开始时间</label>
+            <input type="time" id="quiet_start" value="23:00">
+          </div>
+          <div class="field">
+            <label>结束时间</label>
+            <input type="time" id="quiet_end" value="07:00">
+          </div>
+        </div>
+        <div class="field">
+          <label>时区</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="quiet_tz" value="auto" checked> 自动（根据 IP）
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="quiet_tz" value="manual"> 手动填写
+            </label>
+          </div>
+        </div>
+        <div class="field" id="quiet-tz-field" style="display:none">
+          <input type="text" id="quiet_tz_value" placeholder="如 Asia/Shanghai / America/New_York">
+        </div>
+        <div class="toggle-row" style="margin-top:8px">
+          <label>免打扰结束后推送暂存的职位</label>
+          <label class="toggle">
+            <input type="checkbox" id="hold_and_send" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Telegram</h2>
+      <div class="toggle-row">
+        <label>启用 Telegram 推送</label>
+        <label class="toggle">
+          <input type="checkbox" id="tg_enabled" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="tg-options" style="margin-top:16px">
+        <div class="field">
+          <label>Bot Token</label>
+          <input type="password" id="tg_bot_token" placeholder="从 @BotFather 获取">
+        </div>
+        <div class="field">
+          <label>Chat ID</label>
+          <input type="text" id="tg_chat_id" placeholder="你的 Telegram 用户 ID">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Email（可选）</h2>
+      <div class="toggle-row">
+        <label>启用 Email 推送</label>
+        <label class="toggle">
+          <input type="checkbox" id="email_enabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="email-options" style="display:none; margin-top:16px">
+        <div class="row">
+          <div class="field">
+            <label>SMTP 服务器</label>
+            <input type="text" id="smtp_host" placeholder="smtp.gmail.com">
+          </div>
+          <div class="field">
+            <label>端口</label>
+            <input type="number" id="smtp_port" value="587">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>邮箱账号</label>
+            <input type="email" id="email_username" placeholder="your@email.com">
+          </div>
+          <div class="field">
+            <label>密码 / App Password</label>
+            <input type="password" id="email_password">
+          </div>
+        </div>
+        <div class="field">
+          <label>接收邮箱</label>
+          <input type="email" id="email_to" placeholder="receive@email.com">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 别名学习 -->
+  <div id="panel-alias" class="panel">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px">
+        <div>
+          <h2 style="margin-bottom:4px">关键词别名自动学习 <span style="font-size:12px;font-weight:400;color:#888">可选功能</span></h2>
+          <p style="font-size:13px;color:#888;line-height:1.6">
+            启用后，AI 自动为你的关键词生成同义词和多语言翻译，扩大 LinkedIn 搜索覆盖面。<br>
+            别名会缓存在本地，不会每次都调用 AI。在关键词变更或超过刷新周期时自动更新。
+          </p>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;margin-left:16px">
+          <input type="checkbox" id="al_enabled" onchange="toggleAliasLearning()">
+          <span style="font-size:13px;font-weight:500">启用</span>
+        </label>
+      </div>
+
+      <div id="al-fields" style="display:none">
+        <div class="field">
+          <label>AI 服务商</label>
+          <select id="al_provider">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" id="al_api_key" placeholder="填入对应服务商的 API Key">
+        </div>
+        <div class="field">
+          <label>模型（留空使用默认）</label>
+          <input type="text" id="al_model" placeholder="如 claude-haiku-4-5-20251001">
+          <div class="hint">建议用轻量模型降低成本，如 claude-haiku / gpt-4o-mini / deepseek-chat</div>
+        </div>
+        <div class="field">
+          <label>刷新周期（天）</label>
+          <input type="number" id="al_refresh_days" value="7" min="1" max="30">
+          <div class="hint">超过此天数的缓存会在下次抓取时后台自动刷新</div>
+        </div>
+
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid #f0f0f5">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:14px;font-weight:500">当前缓存</span>
+            <button class="btn btn-sm" onclick="triggerLearnNow()" style="background:#34c759;color:#fff;border:none;">立即学习所有关键词</button>
+          </div>
+          <div id="alias-cache-view" style="font-size:13px;color:#888">保存设置后点「立即学习」可查看</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 简历上传 -->
+  <div id="panel-resume" class="panel">
+    <div class="card">
+      <h2>上传简历</h2>
+      <p style="font-size:13px;color:#888;margin-bottom:16px">关键词匹配模式会从简历中提取技能词进行匹配，AI 模式下可不上传</p>
+      <div id="resume-current-status" style="margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:13px;display:none"></div>
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('resume-input').click()">
+        <div style="font-size:32px">📄</div>
+        <p>点击选择文件，或拖拽到此处</p>
+        <p>支持 .txt / .pdf / .docx</p>
+      </div>
+      <input type="file" id="resume-input" accept=".txt,.pdf,.docx" style="display:none" onchange="uploadResume(this)">
+      <div id="resume-status" style="margin-top:12px; font-size:13px; color:#34c759; display:none"></div>
+    </div>
+  </div>
+
+  <!-- 简历生成器接口配置（在存储 Tab 里补充） -->
+
+  <!-- 职位列表 -->
+  <div id="panel-jobs" class="panel">
+    <div class="card">
+      <div class="tab-switcher">
+        <button class="sub-tab active" onclick="switchJobsView('list')">职位列表</button>
+        <button class="sub-tab" onclick="switchJobsView('trash')">🗑 垃圾箱</button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" id="jobs-filter-bar">
+        <input type="text" id="filter-company" placeholder="筛选公司" style="width:140px" oninput="loadJobs()">
+        <select id="filter-status" onchange="loadJobs()">
+          <option value="">全部状态</option>
+          <option value="new">未处理</option>
+          <option value="applied">已投递</option>
+          <option value="not_applied">不感兴趣</option>
+          <option value="disliked">👎 减少推荐</option>
+          <option value="resume_generated">简历已生成</option>
+          <option value="resume_generating">简历生成中</option>
+          <option value="resume_failed">简历生成失败</option>
+        </select>
+        <input type="date" id="filter-date-from" onchange="loadJobs()" title="发现日期从">
+        <input type="date" id="filter-date-to" onchange="loadJobs()" title="发现日期至">
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="filter-starred" onchange="loadJobs()"> ⭐ 仅收藏
+        </label>
+        <button class="btn btn-primary btn-sm btn-icon" onclick="loadJobs()">刷新</button>
+      </div>
+
+      <!-- Sort bar -->
+      <div class="filter-bar" id="jobs-sort-bar">
+        <span style="font-size:12px;color:#888">排序：</span>
+        <select id="sort-by" onchange="loadJobs()">
+          <option value="created_at">发现时间</option>
+          <option value="match_score">匹配分数</option>
+          <option value="company">公司名称</option>
+          <option value="posted_at">发布时间</option>
+        </select>
+        <select id="sort-dir" onchange="loadJobs()">
+          <option value="desc">降序</option>
+          <option value="asc">升序</option>
+        </select>
+      </div>
+
+      <!-- Export bar -->
+      <div class="export-bar">
+        <span style="font-size:12px;color:#888">导出：</span>
+        <select id="export-fmt">
+          <option value="csv">CSV（Excel）</option>
+          <option value="json">JSON</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="exportJobs()">导出当前列表</button>
+      </div>
+
+      <!-- Jobs table -->
+      <div id="jobs-container">
+        <div class="empty-state">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+    <button id="btn-start" class="btn btn-success" onclick="startTracker()">启动 Job Tracker</button>
+    <button id="btn-stop" class="btn btn-danger" onclick="stopTracker()" style="display:none">停止 Job Tracker</button>
+  </div>
+</div>
+
+<script>
+let config = {{ config | tojson }};
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const panels = ['search','matching','storage','notification','alias','resume','jobs'];
+    t.classList.toggle('active', panels[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'jobs') loadJobs();
+  if (name === 'alias') loadAliasCache();
+}
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alert');
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+// Tag input helper
+const _tagData = {};
+
+function initTagInput(containerId, inputId, initialValues, onChangeFn) {
+  _tagData[containerId] = [...initialValues];
+  const container = document.getElementById(containerId);
+  const input = document.getElementById(inputId);
+
+  function render() {
+    container.querySelectorAll('.tag').forEach(t => t.remove());
+    _tagData[containerId].forEach((tag, i) => {
+      const el = document.createElement('div');
+      el.className = 'tag';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '×';
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        _tagData[containerId].splice(i, 1);
+        render();
+        if (onChangeFn) onChangeFn();
+      };
+      el.appendChild(document.createTextNode(tag + ' '));
+      el.appendChild(btn);
+      container.insertBefore(el, input);
+    });
+  }
+
+  if (!input.dataset.listenerAttached) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && input.value.trim()) {
+        e.preventDefault();
+        _tagData[containerId].push(input.value.trim());
+        input.value = '';
+        render();
+        if (onChangeFn) onChangeFn();
+      }
+    });
+    input.dataset.listenerAttached = 'true';
+  }
+
+  window[`getTagValues_${containerId}`] = () => [..._tagData[containerId]];
+
+  render();
+  return { getTags: () => [..._tagData[containerId]] };
+}
+
+// HTML escape helper
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Times list
+let scheduledTimes = [...(config.notification.scheduled_times || [])];
+
+function renderTimes() {
+  const list = document.getElementById('times-list');
+  list.innerHTML = '';
+  scheduledTimes.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'time-tag';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '×';
+    btn.onclick = (e) => { e.stopPropagation(); removeTime(i); };
+    el.appendChild(document.createTextNode(t + ' '));
+    el.appendChild(btn);
+    list.appendChild(el);
+  });
+}
+
+function addTime() {
+  const val = document.getElementById('new-time-input').value;
+  if (val && !scheduledTimes.includes(val)) {
+    scheduledTimes.push(val);
+    scheduledTimes.sort();
+    renderTimes();
+  }
+}
+
+function removeTime(i) {
+  scheduledTimes.splice(i, 1);
+  renderTimes();
+}
+
+// Populate form from config
+function populate() {
+  const s = config.search;
+  document.getElementById('hours_old').value = s.hours_old;
+  document.getElementById('interval_minutes').value = s.interval_minutes;
+  document.getElementById('retry_max_attempts').value = s.retry.max_attempts;
+  document.getElementById('retry_interval_minutes').value = s.retry.retry_interval_minutes;
+  document.getElementById('pause_on_failure_minutes').value = s.retry.pause_on_failure_minutes;
+
+  // Support both new locations[] format and legacy flat format
+  let locs = s.locations;
+  if (!locs || !locs.length) {
+    locs = [{
+      name: s.location || '我的城市',
+      city: '',
+      country: '',
+      location: s.location || '',
+      enabled: true,
+      radius_km: s.radius_km || 30,
+      keywords: s.keywords || [],
+      keyword_aliases: s.keyword_aliases || {},
+      user_prompt: s.user_prompt || '',
+    }];
+  }
+  renderLocations(locs);
+
+  initTagInput('blacklist-companies-container', 'blacklist-companies-input', s.blacklist.companies || []);
+  initTagInput('blacklist-keywords-container', 'blacklist-keywords-input', s.blacklist.keywords || []);
+
+  const al = config.alias_learning || {};
+  document.getElementById('al_enabled').checked = al.enabled || false;
+  document.getElementById('al_provider').value = al.provider || 'claude';
+  document.getElementById('al_api_key').value = al.api_key || '';
+  document.getElementById('al_model').value = al.model || '';
+  document.getElementById('al_refresh_days').value = al.refresh_days || 7;
+  document.getElementById('al-fields').style.display = al.enabled ? 'block' : 'none';
+
+  const m = config.matching;
+  const modeVal = m.mode === 'keyword' ? 'keywords' : (m.mode || 'keywords');
+  document.querySelector(`input[name="matching_mode"][value="${modeVal}"]`).checked = true;
+  document.getElementById('min_score').value = m.min_score;
+  document.getElementById('ai_provider').value = m.ai.provider;
+  document.getElementById('ai_api_key').value = m.ai.api_key || '';
+  document.getElementById('ai_model').value = m.ai.model || '';
+  document.getElementById('ai_user_prompt').value = m.ai.user_prompt || '';
+
+  const rg = config.resume_generator || {};
+  document.getElementById('rg_enabled').checked = rg.enabled || false;
+  const rgOutput = rg.output || {};
+  const rgMode = rgOutput.mode || 'file';
+  document.querySelector(`input[name="rg_mode"][value="${rgMode}"]`).checked = true;
+  document.getElementById('rg_file_path').value = rgOutput.file_path || '~/.job-tracker/matched_jobs/';
+  document.getElementById('rg_webhook_url').value = rgOutput.webhook_url || '';
+
+  const st = config.storage;
+  document.getElementById('local_path').value = st.local_path;
+  document.getElementById('sheets_enabled').checked = st.google_sheets.enabled;
+  document.getElementById('sheets_id').value = st.google_sheets.sheets_id || '';
+  document.getElementById('credentials_file').value = st.google_sheets.credentials_file || 'credentials.json';
+
+  const n = config.notification;
+  document.querySelector(`input[name="notif_mode"][value="${n.mode}"]`).checked = true;
+  document.getElementById('quiet_enabled').checked = n.quiet_hours.enabled;
+  document.getElementById('quiet_start').value = n.quiet_hours.start;
+  document.getElementById('quiet_end').value = n.quiet_hours.end;
+  document.getElementById('hold_and_send').checked = n.quiet_hours.hold_and_send;
+  const qtz = (n.quiet_hours.timezone && n.quiet_hours.timezone !== 'auto') ? 'manual' : 'auto';
+  const qtzRadio = document.querySelector(`input[name="quiet_tz"][value="${qtz}"]`);
+  if (qtzRadio) qtzRadio.checked = true;
+  if (qtz === 'manual') document.getElementById('quiet_tz_value').value = n.quiet_hours.timezone || '';
+
+  const tg = n.channels.telegram;
+  document.getElementById('tg_enabled').checked = tg.enabled;
+  document.getElementById('tg_bot_token').value = tg.bot_token || '';
+  document.getElementById('tg_chat_id').value = tg.chat_id || '';
+
+  const em = n.channels.email;
+  document.getElementById('email_enabled').checked = em.enabled;
+  document.getElementById('smtp_host').value = em.smtp_host || '';
+  document.getElementById('smtp_port').value = em.smtp_port;
+  document.getElementById('email_username').value = em.username || '';
+  document.getElementById('email_to').value = em.to || '';
+
+  updateVisibility();
+  renderTimes();
+}
+
+function updateVisibility() {
+  const matchMode = document.querySelector('input[name="matching_mode"]:checked').value;
+  document.getElementById('keyword-options').style.display = matchMode === 'keyword' ? 'block' : 'none';
+  document.getElementById('ai-options').style.display = matchMode === 'ai' ? 'block' : 'none';
+
+  const interval = parseInt(document.getElementById('interval_minutes').value);
+  document.getElementById('interval-warning').style.display = interval < 30 ? 'block' : 'none';
+
+  document.getElementById('sheets-options').style.display =
+    document.getElementById('sheets_enabled').checked ? 'block' : 'none';
+
+  const notifMode = document.querySelector('input[name="notif_mode"]:checked').value;
+  document.getElementById('scheduled-times-options').style.display =
+    notifMode === 'scheduled' ? 'block' : 'none';
+
+  document.getElementById('quiet-options').style.display =
+    document.getElementById('quiet_enabled').checked ? 'block' : 'none';
+  const qtzVal = document.querySelector('input[name="quiet_tz"]:checked')?.value || 'auto';
+  document.getElementById('quiet-tz-field').style.display = qtzVal === 'manual' ? 'block' : 'none';
+
+  document.getElementById('email-options').style.display =
+    document.getElementById('email_enabled').checked ? 'block' : 'none';
+
+  document.getElementById('rg-options').style.display =
+    document.getElementById('rg_enabled').checked ? 'block' : 'none';
+  const rgMode = document.querySelector('input[name="rg_mode"]:checked')?.value || 'file';
+  document.getElementById('rg-file-field').style.display = rgMode === 'file' ? 'block' : 'none';
+  document.getElementById('rg-webhook-field').style.display = rgMode === 'webhook' ? 'block' : 'none';
+}
+
+function collectConfig() {
+  return {
+    search: {
+      location_mode: 'manual',
+      locations: collectLocations(),
+      hours_old: parseInt(document.getElementById('hours_old').value),
+      interval_minutes: parseInt(document.getElementById('interval_minutes').value),
+      retry: {
+        max_attempts: parseInt(document.getElementById('retry_max_attempts').value),
+        retry_interval_minutes: parseInt(document.getElementById('retry_interval_minutes').value),
+        pause_on_failure_minutes: parseInt(document.getElementById('pause_on_failure_minutes').value),
+      },
+      blacklist: {
+        companies: window['getTagValues_blacklist-companies-container'](),
+        keywords: window['getTagValues_blacklist-keywords-container'](),
+      },
+    },
+    matching: {
+      mode: document.querySelector('input[name="matching_mode"]:checked').value,
+      min_score: parseInt(document.getElementById('min_score').value),
+      resume_file: config.matching.resume_file || 'resume.txt',
+      ai: {
+        provider: document.getElementById('ai_provider').value,
+        api_key: document.getElementById('ai_api_key').value,
+        model: document.getElementById('ai_model').value,
+        user_prompt: document.getElementById('ai_user_prompt').value,
+      },
+    },
+    resume_generator: {
+      enabled: document.getElementById('rg_enabled').checked,
+      description: "将匹配职位实时输出给简历定制生成器，AI 根据职位 JD 和你的简历生成针对该职位的定制版简历",
+      output: {
+        mode: document.querySelector('input[name="rg_mode"]:checked').value,
+        file_path: document.getElementById('rg_file_path').value,
+        webhook_url: document.getElementById('rg_webhook_url').value,
+      },
+    },
+    storage: {
+      mode: config.storage?.mode || 'local',
+      local_path: document.getElementById('local_path').value,
+      google_sheets: {
+        enabled: document.getElementById('sheets_enabled').checked,
+        sheets_id: document.getElementById('sheets_id').value,
+        credentials_file: document.getElementById('credentials_file').value,
+      },
+    },
+    notification: {
+      mode: document.querySelector('input[name="notif_mode"]:checked').value,
+      scheduled_times: scheduledTimes,
+      timezone: 'auto',
+      channels: {
+        telegram: {
+          enabled: document.getElementById('tg_enabled').checked,
+          bot_token: document.getElementById('tg_bot_token').value,
+          chat_id: document.getElementById('tg_chat_id').value,
+        },
+        email: {
+          enabled: document.getElementById('email_enabled').checked,
+          smtp_host: document.getElementById('smtp_host').value,
+          smtp_port: parseInt(document.getElementById('smtp_port').value),
+          username: document.getElementById('email_username').value,
+          password: document.getElementById('email_password').value,
+          to: document.getElementById('email_to').value,
+        },
+      },
+      quiet_hours: {
+        enabled: document.getElementById('quiet_enabled').checked,
+        start: document.getElementById('quiet_start').value,
+        end: document.getElementById('quiet_end').value,
+        timezone: (document.querySelector('input[name="quiet_tz"]:checked')?.value === 'manual')
+          ? (document.getElementById('quiet_tz_value').value.trim() || 'auto') : 'auto',
+        hold_and_send: document.getElementById('hold_and_send').checked,
+      },
+    },
+    alias_learning: {
+      enabled: document.getElementById('al_enabled').checked,
+      provider: document.getElementById('al_provider').value,
+      api_key: document.getElementById('al_api_key').value,
+      model: document.getElementById('al_model').value,
+      refresh_days: parseInt(document.getElementById('al_refresh_days').value) || 7,
+    },
+  };
+}
+
+function _criticalChanged(oldCfg, newCfg) {
+  const locsOld = JSON.stringify(oldCfg.search?.locations || []);
+  const locsNew = JSON.stringify(newCfg.search?.locations || []);
+  return locsOld !== locsNew || oldCfg.matching?.mode !== newCfg.matching?.mode;
+}
+
+async function saveConfig() {
+  // Validate city/country for each location
+  const locs = collectLocations();
+  let hasError = false;
+  for (let i = 0; i < _numLocations; i++) {
+    if (!document.getElementById(`loc-card-${i}`)) continue;
+    const cityEl = document.getElementById(`loc-${i}-city`);
+    const countryEl = document.getElementById(`loc-${i}-country`);
+    const cityErrEl = document.getElementById(`loc-${i}-city-err`);
+    const countryErrEl = document.getElementById(`loc-${i}-country-err`);
+    const city = (cityEl?.value || '').trim();
+    const country = (countryEl?.value || '').trim();
+    [cityEl, countryEl].forEach(el => el && el.classList.remove('error'));
+    [cityErrEl, countryErrEl].forEach(el => { if (el) el.textContent = ''; });
+    if (!city) {
+      if (cityEl) { cityEl.classList.add('error'); }
+      if (cityErrEl) cityErrEl.textContent = '城市不能为空';
+      hasError = true;
+    } else if (city.length < 2) {
+      if (cityEl) cityEl.classList.add('error');
+      if (cityErrEl) cityErrEl.textContent = '城市名称太短';
+      hasError = true;
+    } else if (/\d/.test(city)) {
+      if (cityEl) cityEl.classList.add('error');
+      if (cityErrEl) cityErrEl.textContent = '城市名不应包含数字';
+      hasError = true;
+    } else if (city.includes(',')) {
+      if (cityEl) cityEl.classList.add('error');
+      if (cityErrEl) cityErrEl.textContent = '城市名不应包含逗号，国家请填入右侧输入框';
+      hasError = true;
+    }
+    if (!country) {
+      if (countryEl) countryEl.classList.add('error');
+      if (countryErrEl) countryErrEl.textContent = '国家不能为空（避免城市名歧义，如 Milano TX 与 Milano Italy）';
+      hasError = true;
+    } else if (country.length < 2) {
+      if (countryEl) countryEl.classList.add('error');
+      if (countryErrEl) countryErrEl.textContent = '国家名称太短';
+      hasError = true;
+    } else if (country.includes(',')) {
+      if (countryEl) countryEl.classList.add('error');
+      if (countryErrEl) countryErrEl.textContent = '国家名不应包含逗号';
+      hasError = true;
+    }
+  }
+  if (hasError) { showAlert('请检查地区配置：城市和国家均不能为空', 'error'); return; }
+
+  const data = collectConfig();
+  const changed = _criticalChanged(config, data);
+
+  const res = await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    showAlert('保存失败：' + json.error, 'error');
+    return;
+  }
+
+  config = data;
+
+  // Check if tracker is running and critical fields changed
+  if (changed) {
+    const statusRes = await fetch('/api/status');
+    const status = await statusRes.json();
+    if (status.running) {
+      const restart = confirm(
+        '检测到关键词或匹配模式已修改。\n\n' +
+        'Job Tracker 正在运行中，修改将在下次抓取时自动生效。\n\n' +
+        '是否现在重启以立即生效？'
+      );
+      if (restart) {
+        await fetch('/api/stop', { method: 'POST' });
+        const startRes = await fetch('/api/start', { method: 'POST' });
+        const startJson = await startRes.json();
+        showAlert(startJson.success ? '✅ 配置已保存，Tracker 已重启' : '配置已保存，重启失败：' + startJson.error,
+                  startJson.success ? 'success' : 'warning');
+        updateStatusUI(startJson.success);
+        return;
+      }
+    }
+  }
+
+  showAlert(json.warning || '配置已保存', json.warning ? 'warning' : 'success');
+}
+
+// ── Tracker status ───────────────────────────────
+function updateStatusUI(running) {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  dot.className = 'status-dot ' + (running ? 'running' : 'stopped');
+  text.textContent = running ? '运行中' : '已停止';
+  text.style.color = running ? '#34c759' : '#aaa';
+  btnStart.style.display = running ? 'none' : '';
+  btnStop.style.display = running ? '' : 'none';
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const json = await res.json();
+    updateStatusUI(json.running);
+  } catch (_) {}
+}
+
+// Poll every 5 seconds
+pollStatus();
+setInterval(pollStatus, 5000);
+
+async function startTracker() {
+  await saveConfig();
+  const res = await fetch('/api/start', { method: 'POST' });
+  const json = await res.json();
+  showAlert(json.success ? '✅ ' + json.message : '❌ ' + json.error, json.success ? 'success' : 'error');
+  if (json.success) updateStatusUI(true);
+}
+
+async function stopTracker() {
+  const res = await fetch('/api/stop', { method: 'POST' });
+  const json = await res.json();
+  showAlert(json.success ? '⏹ ' + json.message : '❌ ' + json.error, json.success ? 'success' : 'error');
+  if (json.success) updateStatusUI(false);
+}
+
+async function loadResumeStatus() {
+  try {
+    const res = await fetch('/api/resume_status');
+    const json = await res.json();
+    const el = document.getElementById('resume-current-status');
+    if (json.exists) {
+      el.style.background = '#d1fae5';
+      el.style.color = '#065f46';
+      el.textContent = '✅ 已上传：' + json.filename;
+    } else {
+      el.style.background = '#fef3c7';
+      el.style.color = '#92400e';
+      el.textContent = '⚠️ 未上传简历 — 关键词匹配模式下无法启动，请上传简历文件';
+    }
+    el.style.display = 'block';
+  } catch (e) {}
+}
+
+async function uploadResume(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/upload_resume', { method: 'POST', body: form });
+  const json = await res.json();
+  const status = document.getElementById('resume-status');
+  status.textContent = json.success ? '✅ ' + json.message : '❌ ' + json.error;
+  status.style.color = json.success ? '#34c759' : '#ff3b30';
+  status.style.display = 'block';
+  if (json.success) loadResumeStatus();
+}
+
+// Drag and drop
+const uploadArea = document.getElementById('upload-area');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = '#0071e3'; });
+uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = '#d1d1d6'; });
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.style.borderColor = '#d1d1d6';
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('resume-input').files = dt.files;
+    uploadResume(document.getElementById('resume-input'));
+  }
+});
+
+// ── Location management ───────────────────────────────
+const LOC_COLORS = ['#0071e3','#34c759','#ff9500','#af52de','#ff3b30','#5ac8fa'];
+let _numLocations = 0;
+let _locAliases = []; // [{ keyword: [aliases...] }, ...]
+
+function renderLocations(locations) {
+  _numLocations = locations.length;
+  _locAliases = locations.map(() => ({}));
+  // Backfill city/country from location string for legacy data
+  locations.forEach(loc => {
+    if (!loc.city && !loc.country && loc.location) {
+      const parts = loc.location.split(',').map(s => s.trim());
+      loc.city = parts[0] || '';
+      loc.country = parts.slice(1).join(', ').trim();
+    }
+  });
+  const container = document.getElementById('locations-list');
+  container.innerHTML = locations.map((loc, i) => _renderLocCard(i, loc)).join('');
+  locations.forEach((loc, i) => {
+    initTagInput(
+      `loc-${i}-kw-container`,
+      `loc-${i}-kw-input`,
+      loc.keywords || [],
+      () => _syncLocAliasesWithKeywords(i)
+    );
+    _renderLocAliasesEditor(i, loc.keywords || [], loc.keyword_aliases || {});
+    const bl = loc.blacklist || { companies: [], keywords: [] };
+    initTagInput(`loc-${i}-bl-companies-container`, `loc-${i}-bl-companies-input`, bl.companies || []);
+    initTagInput(`loc-${i}-bl-keywords-container`, `loc-${i}-bl-keywords-input`, bl.keywords || []);
+  });
+}
+
+function _renderLocCard(i, loc) {
+  const color = LOC_COLORS[i % LOC_COLORS.length];
+  const enabled = loc.enabled !== false;
+  return `
+  <div class="loc-card ${enabled ? '' : 'loc-disabled'}" id="loc-card-${i}" style="border-left-color:${color}">
+    <div class="loc-card-header">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <div class="loc-index-badge" style="background:${color}">${i + 1}</div>
+        <input class="loc-name-input" id="loc-${i}-name" value="${escHtml(loc.name)}" placeholder="地点名称">
+        ${(loc.keywords||[]).length ? `<span style="font-size:11px;color:#86868b;background:#f0f0f5;padding:2px 8px;border-radius:10px;flex-shrink:0">${loc.keywords.length} 个关键词</span>` : `<span style="font-size:11px;color:#ff9500;background:#fff8ee;padding:2px 8px;border-radius:10px;flex-shrink:0">未设置关键词</span>`}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <span style="font-size:12px;color:#555;display:flex;align-items:center;gap:5px;cursor:pointer">
+          启用
+          <label class="toggle" style="margin:0">
+            <input type="checkbox" id="loc-${i}-enabled" ${enabled ? 'checked' : ''} onchange="document.getElementById('loc-card-${i}').className='loc-card '+(this.checked?'':'loc-disabled');document.getElementById('loc-card-${i}').style.borderLeftColor='${color}'">
+            <span class="slider"></span>
+          </label>
+        </span>
+        <button class="btn btn-sm" style="background:#ff3b30;color:#fff;padding:4px 10px" onclick="removeLocation(${i})">删除</button>
+      </div>
+    </div>
+    <div class="loc-card-body">
+      <div class="row">
+        <div class="field">
+          <label>城市</label>
+          <input class="loc-input" type="text" id="loc-${i}-city" value="${escHtml(loc.city || '')}" placeholder="如：Frankfurt">
+          <div class="loc-error" id="loc-${i}-city-err"></div>
+        </div>
+        <div class="field">
+          <label>国家</label>
+          <input class="loc-input" type="text" id="loc-${i}-country" value="${escHtml(loc.country || '')}" placeholder="如：Germany">
+          <div class="loc-error" id="loc-${i}-country-err"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:0">
+        <div class="field">
+          <label>搜索半径（公里）</label>
+          <input type="number" id="loc-${i}-radius" value="${loc.radius_km || 30}" min="5" max="200">
+        </div>
+        <div class="field"></div>
+      </div>
+      <div class="field">
+        <label>该地点搜索的职位关键词 <span style="font-size:11px;font-weight:400;color:#86868b">· 只在此地搜索这些岗位，回车添加</span></label>
+        <div class="tag-input-container" id="loc-${i}-kw-container" onclick="document.getElementById('loc-${i}-kw-input').focus()">
+          <input type="text" class="tag-input" id="loc-${i}-kw-input" placeholder="输入后按回车">
+        </div>
+        <div class="hint">多个关键词用 OR 逻辑搜索</div>
+      </div>
+      <div class="field" style="margin-top:4px">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleLocAliases(${i})">
+          <span style="display:flex;align-items:center;gap:8px">
+            关键词别名 / 翻译
+            <span style="font-size:11px;font-weight:400;color:#86868b">解决跨语言和同义词漏搜</span>
+          </span>
+          <span id="loc-${i}-alias-toggle-icon" style="font-size:12px;color:#0071e3">展开 ▼</span>
+        </label>
+        <div id="loc-${i}-aliases-editor" style="margin-top:8px;display:none;flex-direction:column;gap:8px">
+          <div style="font-size:12px;color:#86868b;font-style:italic">先添加关键词后配置别名</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:4px">
+        <label>AI 匹配描述 <span style="font-size:11px;font-weight:400;color:#86868b">· AI 模式下描述此地点的求职要求</span></label>
+        <textarea id="loc-${i}-prompt" style="min-height:54px" placeholder="如：德国的电气工程类相关工作，例如电气工程师、电力工程师等">${escHtml(loc.user_prompt)}</textarea>
+      </div>
+      <div class="field" style="margin-top:4px">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleLocBlacklist(${i})">
+          <span style="display:flex;align-items:center;gap:8px">
+            🚫 该地区黑名单
+            <span style="font-size:11px;font-weight:400;color:#86868b">仅对此地区生效，优先于全局黑名单</span>
+          </span>
+          <span id="loc-${i}-bl-toggle-icon" style="font-size:12px;color:#0071e3">展开 ▼</span>
+        </label>
+        <div id="loc-${i}-bl-body" style="display:none;margin-top:10px;flex-direction:column;gap:10px">
+          <div>
+            <div style="font-size:12px;color:#555;margin-bottom:4px">屏蔽公司（回车添加）</div>
+            <div class="tag-input-container" id="loc-${i}-bl-companies-container" onclick="document.getElementById('loc-${i}-bl-companies-input').focus()">
+              <input type="text" class="tag-input" id="loc-${i}-bl-companies-input" placeholder="输入公司名后按回车">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:#555;margin-bottom:4px">屏蔽关键词（出现在职位标题中则过滤）</div>
+            <div class="tag-input-container" id="loc-${i}-bl-keywords-container" onclick="document.getElementById('loc-${i}-bl-keywords-input').focus()">
+              <input type="text" class="tag-input" id="loc-${i}-bl-keywords-input" placeholder="如 intern / unpaid">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function addLocation() {
+  const i = _numLocations;
+  _numLocations++;
+  _locAliases[i] = {};
+  const newLoc = { name: `地点 ${i + 1}`, city: '', country: '', location: '', enabled: true, radius_km: 30, keywords: [], keyword_aliases: {}, user_prompt: '' };
+  const container = document.getElementById('locations-list');
+  const div = document.createElement('div');
+  div.innerHTML = _renderLocCard(i, newLoc);
+  container.appendChild(div.firstElementChild);
+  initTagInput(`loc-${i}-kw-container`, `loc-${i}-kw-input`, [], () => _syncLocAliasesWithKeywords(i));
+  _renderLocAliasesEditor(i, [], {});
+  initTagInput(`loc-${i}-bl-companies-container`, `loc-${i}-bl-companies-input`, []);
+  initTagInput(`loc-${i}-bl-keywords-container`, `loc-${i}-bl-keywords-input`, []);
+  document.getElementById(`loc-card-${i}`).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function removeLocation(i) {
+  if (_numLocations <= 1) { showAlert('至少保留一个地点', 'warning'); return; }
+  const locs = collectLocations();
+  locs.splice(i, 1);
+  renderLocations(locs);
+}
+
+function collectLocations() {
+  const locs = [];
+  for (let i = 0; i < _numLocations; i++) {
+    if (!document.getElementById(`loc-card-${i}`)) continue;
+    const keywords = window[`getTagValues_loc-${i}-kw-container`]?.() || [];
+    const city = (document.getElementById(`loc-${i}-city`)?.value || '').trim();
+    const country = (document.getElementById(`loc-${i}-country`)?.value || '').trim();
+    const location = city && country ? `${city}, ${country}` : city || country || '';
+    locs.push({
+      name: document.getElementById(`loc-${i}-name`)?.value || '',
+      city,
+      country,
+      location,
+      enabled: document.getElementById(`loc-${i}-enabled`)?.checked !== false,
+      radius_km: parseInt(document.getElementById(`loc-${i}-radius`)?.value) || 30,
+      keywords,
+      keyword_aliases: _collectLocAliases(i, keywords),
+      user_prompt: document.getElementById(`loc-${i}-prompt`)?.value || '',
+      blacklist: {
+        companies: window[`getTagValues_loc-${i}-bl-companies-container`]?.() || [],
+        keywords: window[`getTagValues_loc-${i}-bl-keywords-container`]?.() || [],
+      },
+    });
+  }
+  return locs;
+}
+
+function _collectLocAliases(locIdx, keywords) {
+  const result = {};
+  const a = _locAliases[locIdx] || {};
+  keywords.forEach(kw => { if (a[kw] && a[kw].length) result[kw] = a[kw]; });
+  return result;
+}
+
+function toggleLocBlacklist(i) {
+  const body = document.getElementById(`loc-${i}-bl-body`);
+  const icon = document.getElementById(`loc-${i}-bl-toggle-icon`);
+  if (!body) return;
+  const open = body.style.display !== 'none' && body.style.display !== '';
+  body.style.display = open ? 'none' : 'flex';
+  icon.textContent = open ? '展开 ▼' : '收起 ▲';
+}
+
+// ── Per-location alias editor ─────────────────────────────────────────────
+
+function _renderLocAliasesEditor(locIdx, keywords, aliases) {
+  _locAliases[locIdx] = {};
+  keywords.forEach(kw => { _locAliases[locIdx][kw] = aliases[kw] || []; });
+  _drawLocAliases(locIdx);
+}
+
+function _drawLocAliases(locIdx) {
+  const el = document.getElementById(`loc-${locIdx}-aliases-editor`);
+  if (!el) return;
+  const a = _locAliases[locIdx] || {};
+  const keywords = Object.keys(a);
+  if (!keywords.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#86868b;font-style:italic">先添加关键词后配置别名</div>';
+    return;
+  }
+  el.innerHTML = keywords.map(kw => `
+    <div class="alias-row">
+      <div class="alias-kw">${escHtml(kw)}</div>
+      <div style="flex:1">
+        <div class="alias-tags" id="loc-${locIdx}-alias-tags-${_safeId(kw)}">
+          ${(a[kw] || []).map(alias => `<span class="alias-tag">${escHtml(alias)}<button type="button" onclick="removeLocAlias(${locIdx},'${_safeId(kw)}','${escHtml(alias)}','${escHtml(kw)}')">×</button></span>`).join('')}
+        </div>
+        <div class="alias-add" style="margin-top:${(a[kw]||[]).length ? '8px' : '0'}">
+          <input class="alias-input" id="loc-${locIdx}-alias-input-${_safeId(kw)}" placeholder="添加别名或翻译，回车确认"
+            onkeydown="if(event.key==='Enter'){addLocAlias(${locIdx},'${escHtml(kw)}');event.preventDefault();}">
+          <button class="alias-btn" onclick="addLocAlias(${locIdx},'${escHtml(kw)}')">+ 添加</button>
+          <button class="alias-btn" style="background:#34c759" onclick="suggestLocAliases(${locIdx},'${escHtml(kw)}')" id="loc-${locIdx}-suggest-${_safeId(kw)}">AI 建议</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleLocAliases(locIdx) {
+  const el = document.getElementById(`loc-${locIdx}-aliases-editor`);
+  const icon = document.getElementById(`loc-${locIdx}-alias-toggle-icon`);
+  if (!el) return;
+  const isHidden = el.style.display === 'none' || el.style.display === '';
+  el.style.display = isHidden ? 'flex' : 'none';
+  if (icon) icon.textContent = isHidden ? '收起 ▲' : '展开 ▼';
+}
+
+function addLocAlias(locIdx, kw) {
+  const input = document.getElementById(`loc-${locIdx}-alias-input-${_safeId(kw)}`);
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) return;
+  if (!_locAliases[locIdx]) _locAliases[locIdx] = {};
+  if (!_locAliases[locIdx][kw]) _locAliases[locIdx][kw] = [];
+  if (!_locAliases[locIdx][kw].includes(val)) _locAliases[locIdx][kw].push(val);
+  input.value = '';
+  _drawLocAliases(locIdx);
+  setTimeout(() => { const el = document.getElementById(`loc-${locIdx}-alias-input-${_safeId(kw)}`); if (el) el.focus(); }, 50);
+}
+
+function removeLocAlias(locIdx, safeKw, alias, kw) {
+  // Find actual kw by safeId match
+  const actualKw = kw || Object.keys(_locAliases[locIdx] || {}).find(k => _safeId(k) === safeKw) || safeKw;
+  if (_locAliases[locIdx] && _locAliases[locIdx][actualKw]) {
+    _locAliases[locIdx][actualKw] = _locAliases[locIdx][actualKw].filter(a => a !== alias);
+  }
+  _drawLocAliases(locIdx);
+}
+
+async function suggestLocAliases(locIdx, kw) {
+  const btn = document.getElementById(`loc-${locIdx}-suggest-${_safeId(kw)}`);
+  if (!btn) return;
+  const origText = btn.textContent;
+  btn.textContent = '生成中...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/suggest_aliases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: kw }),
+    });
+    const data = await res.json();
+    if (!data.success) { alert(data.error); return; }
+    const existing = (_locAliases[locIdx]?.[kw] || []).map(a => a.toLowerCase());
+    let added = 0;
+    data.aliases.forEach(a => {
+      if (!existing.includes(a.toLowerCase()) && a.toLowerCase() !== kw.toLowerCase()) {
+        if (!_locAliases[locIdx]) _locAliases[locIdx] = {};
+        if (!_locAliases[locIdx][kw]) _locAliases[locIdx][kw] = [];
+        _locAliases[locIdx][kw].push(a);
+        added++;
+      }
+    });
+    _drawLocAliases(locIdx);
+    if (added === 0) alert('AI 建议的词已全部存在');
+  } catch(e) {
+    alert('请求失败：' + e.message);
+  } finally {
+    setTimeout(() => { const b = document.getElementById(`loc-${locIdx}-suggest-${_safeId(kw)}`); if (b) { b.textContent = origText; b.disabled = false; } }, 100);
+  }
+}
+
+function _syncLocAliasesWithKeywords(locIdx) {
+  const currentKws = window[`getTagValues_loc-${locIdx}-kw-container`]?.() || [];
+  if (!_locAliases[locIdx]) _locAliases[locIdx] = {};
+  const newKws = currentKws.filter(kw => !Object.prototype.hasOwnProperty.call(_locAliases[locIdx], kw));
+  currentKws.forEach(kw => { if (!_locAliases[locIdx][kw]) _locAliases[locIdx][kw] = []; });
+  Object.keys(_locAliases[locIdx]).forEach(kw => { if (!currentKws.includes(kw)) delete _locAliases[locIdx][kw]; });
+  _drawLocAliases(locIdx);
+  if (newKws.length) {
+    const alEnabled = document.getElementById('al_enabled')?.checked;
+    const alApiKey = document.getElementById('al_api_key')?.value?.trim();
+    const _city = document.getElementById(`loc-${locIdx}-city`)?.value?.trim() || '';
+    const _country = document.getElementById(`loc-${locIdx}-country`)?.value?.trim() || '';
+    const locName = _city && _country ? `${_city}, ${_country}` : _city || _country || '';
+    if (alEnabled && alApiKey) _learnAliasesForNewKeywords(newKws, locName);
+  }
+}
+
+// ── Alias Learning ───────────────────────────────
+function toggleAliasLearning() {
+  document.getElementById('al-fields').style.display =
+    document.getElementById('al_enabled').checked ? 'block' : 'none';
+}
+
+async function triggerLearnNow() {
+  const locs = collectLocations();
+  const allKws = [...new Set(locs.flatMap(l => l.keywords))];
+  const locStr = locs.map(l => l.location).filter(Boolean).join(', ');
+  const res = await fetch('/api/alias_learn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keywords: allKws, location: locStr }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showAlert(data.message + '\n（后台运行中，稍后刷新可查看结果）', 'success');
+    setTimeout(loadAliasCache, 3000);
+  } else {
+    showAlert(data.error, 'error');
+  }
+}
+
+async function loadAliasCache() {
+  const res = await fetch('/api/alias_cache');
+  const cache = await res.json();
+  const el = document.getElementById('alias-cache-view');
+  const kws = Object.keys(cache.keywords || {});
+  if (!kws.length) {
+    el.innerHTML = '<span style="color:#888">暂无缓存</span>';
+    return;
+  }
+  el.innerHTML = kws.map(kw => {
+    const data = cache.keywords[kw];
+    const last = data.last_updated || '未知';
+    const langs = Object.keys(data).filter(k => k !== 'last_updated');
+    const aliases = langs.flatMap(l => (data[l] || []).map(a => `<span style="background:#e8f4fd;color:#0071e3;padding:2px 8px;border-radius:12px;font-size:12px;margin:2px;display:inline-block">${a}</span>`));
+    return `<div style="margin-bottom:12px">
+      <div style="font-weight:500;margin-bottom:4px">${kw} <span style="color:#888;font-size:12px;font-weight:400">· 更新于 ${last}</span></div>
+      <div>${aliases.join('') || '<span style="color:#888">暂无别名</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+function _safeId(kw) {
+  return kw.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+async function _learnAliasesForNewKeywords(keywords, location) {
+  const res = await fetch('/api/alias_learn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keywords, location: location || '' }),
+  });
+  const data = await res.json();
+  if (data.success) setTimeout(loadAliasCache, 3000);
+}
+
+// Event listeners
+document.querySelectorAll('input[name="matching_mode"]').forEach(r => r.addEventListener('change', updateVisibility));
+document.querySelectorAll('input[name="notif_mode"]').forEach(r => r.addEventListener('change', updateVisibility));
+document.getElementById('interval_minutes').addEventListener('input', updateVisibility);
+document.getElementById('sheets_enabled').addEventListener('change', updateVisibility);
+document.getElementById('quiet_enabled').addEventListener('change', updateVisibility);
+document.querySelectorAll('input[name="quiet_tz"]').forEach(r => r.addEventListener('change', updateVisibility));
+document.getElementById('email_enabled').addEventListener('change', updateVisibility);
+document.getElementById('rg_enabled').addEventListener('change', updateVisibility);
+document.querySelectorAll('input[name="rg_mode"]').forEach(r => r.addEventListener('change', updateVisibility));
+
+populate();
+loadResumeStatus();
+
+// ── Jobs Tab ──────────────────────────────────────────────
+
+let jobsViewMode = 'list'; // 'list' | 'trash'
+
+function switchJobsView(mode) {
+  jobsViewMode = mode;
+  document.querySelectorAll('.sub-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['list','trash'][i] === mode);
+  });
+  const filterBar = document.getElementById('jobs-filter-bar');
+  const sortBar = document.getElementById('jobs-sort-bar');
+  filterBar.style.display = mode === 'trash' ? 'none' : 'flex';
+  sortBar.style.display = mode === 'trash' ? 'none' : 'flex';
+  loadJobs();
+}
+
+async function loadJobs() {
+  const trash = jobsViewMode === 'trash';
+  const params = new URLSearchParams({
+    sort_by: document.getElementById('sort-by')?.value || 'created_at',
+    sort_dir: document.getElementById('sort-dir')?.value || 'desc',
+    company: document.getElementById('filter-company')?.value || '',
+    status: document.getElementById('filter-status')?.value || '',
+    starred: document.getElementById('filter-starred')?.checked ? '1' : '0',
+    date_from: document.getElementById('filter-date-from')?.value || '',
+    date_to: document.getElementById('filter-date-to')?.value || '',
+    trash: trash ? '1' : '0',
+  });
+  const res = await fetch('/api/jobs?' + params);
+  const jobs = await res.json();
+  renderJobs(jobs, trash);
+}
+
+function renderJobs(jobs, trash) {
+  const container = document.getElementById('jobs-container');
+  if (!jobs.length) {
+    container.innerHTML = `<div class="empty-state">${trash ? '垃圾箱为空' : '暂无职位记录'}</div>`;
+    return;
+  }
+
+  const rows = jobs.map(j => {
+    const statusMap = { new: '未处理', applied: '已投递', not_applied: '不感兴趣' };
+    const statusClass = { new: 'status-new', applied: 'status-applied', not_applied: 'status-not_applied' };
+    const starIcon = j.starred ? '⭐' : '☆';
+    const score = j.match_score > 0 ? `<span style="color:#0071e3;font-weight:600">${j.match_score}</span>` : '<span style="color:#aaa">AI</span>';
+
+    if (trash) {
+      return `<tr>
+        <td><b>${j.title}</b><br><span style="color:#888;font-size:11px">${j.company}</span></td>
+        <td>${j.location || '-'}</td>
+        <td style="color:#888;font-size:11px">${(j.deleted_at||'').slice(0,10)}</td>
+        <td>
+          <div class="job-actions">
+            <button class="icon-btn" title="恢复" onclick="restoreJob('${j.id}')">♻️</button>
+            <button class="icon-btn" title="永久删除" onclick="permDeleteJob('${j.id}')">💀</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    return `<tr class="${j.starred ? 'starred' : ''}" id="row-${j.id}">
+      <td>
+        <a href="${j.link}" target="_blank" style="font-weight:600;color:#0071e3;text-decoration:none">${j.title}</a>
+        <br><span style="color:#888;font-size:11px">${j.company}</span>
+      </td>
+      <td style="color:#555">${j.location || '-'}</td>
+      <td style="color:#888;font-size:11px;white-space:nowrap">${(j.posted_at||'').slice(0,10) || '-'}</td>
+      <td>${score}</td>
+      <td>
+        <select class="notes-input" style="width:auto;padding:3px 6px" onchange="updateJob('${j.id}', {status: this.value})">
+          <option value="new" ${j.status==='new'?'selected':''}>未处理</option>
+          <option value="applied" ${j.status==='applied'?'selected':''}>已投递</option>
+          <option value="not_applied" ${j.status==='not_applied'?'selected':''}>不感兴趣</option>
+          <option value="disliked" ${j.status==='disliked'?'selected':''}>👎 减少推荐</option>
+          <option value="resume_generated" ${j.status==='resume_generated'?'selected':''}>简历已生成</option>
+          <option value="resume_generating" ${j.status==='resume_generating'?'selected':''}>简历生成中</option>
+          <option value="resume_failed" ${j.status==='resume_failed'?'selected':''}>简历生成失败</option>
+        </select>
+      </td>
+      <td>
+        <input class="notes-input" style="width:120px" placeholder="备注..." value="${j.notes||''}"
+          onblur="updateJob('${j.id}', {notes: this.value})">
+      </td>
+      <td>
+        <div class="job-actions">
+          <button class="icon-btn" title="${j.starred?'取消收藏':'收藏'}" onclick="toggleStar('${j.id}', ${j.starred})">${starIcon}</button>
+          <button class="icon-btn" title="移到垃圾箱" onclick="deleteJob('${j.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const headers = trash
+    ? `<tr><th>职位</th><th>地点</th><th>删除时间</th><th>操作</th></tr>`
+    : `<tr>
+        <th onclick="setSortBy('title')">职位 ↕</th>
+        <th>地点</th>
+        <th onclick="setSortBy('posted_at')">发布时间 ↕</th>
+        <th onclick="setSortBy('match_score')">匹配 ↕</th>
+        <th>状态</th>
+        <th>备注</th>
+        <th>操作</th>
+      </tr>`;
+
+  container.innerHTML = `<table class="job-table"><thead>${headers}</thead><tbody>${rows}</tbody></table>`;
+}
+
+function setSortBy(col) {
+  const sortBy = document.getElementById('sort-by');
+  const sortDir = document.getElementById('sort-dir');
+  if (sortBy.value === col) {
+    sortDir.value = sortDir.value === 'desc' ? 'asc' : 'desc';
+  } else {
+    sortBy.value = col;
+    sortDir.value = 'desc';
+  }
+  loadJobs();
+}
+
+async function updateJob(id, data) {
+  await fetch(`/api/jobs/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+async function toggleStar(id, current) {
+  await updateJob(id, { starred: current ? 0 : 1 });
+  loadJobs();
+}
+
+async function deleteJob(id) {
+  await fetch(`/api/jobs/${id}/delete`, { method: 'POST' });
+  loadJobs();
+}
+
+async function restoreJob(id) {
+  await fetch(`/api/jobs/${id}/restore`, { method: 'POST' });
+  loadJobs();
+}
+
+async function permDeleteJob(id) {
+  if (!confirm('永久删除后无法恢复，确认吗？')) return;
+  await fetch(`/api/jobs/${id}/permanent_delete`, { method: 'POST' });
+  loadJobs();
+}
+
+function exportJobs() {
+  const fmt = document.getElementById('export-fmt').value;
+  const trash = jobsViewMode === 'trash' ? '1' : '0';
+  window.location.href = `/api/jobs/export?fmt=${fmt}&trash=${trash}`;
+}
+
+// Jobs tab loaded via switchTab()
+</script>
+</body>
+</html>

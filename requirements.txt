@@ -1,0 +1,9 @@
+python-jobspy
+flask
+requests
+gspread
+google-auth
+anthropic
+openai
+PyPDF2
+python-docx

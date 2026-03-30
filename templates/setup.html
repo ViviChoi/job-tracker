@@ -303,6 +303,21 @@
           <input type="text" id="rg_webhook_url" placeholder="http://your-server/api/generate-resume">
           <div class="hint">匹配到职位时立即 POST 到此地址</div>
         </div>
+        <div class="field">
+          <label>简历生成语言</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="rg_language" value="follow_jd" checked> 跟随 JD 语言
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="rg_language" value="en"> English
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="rg_language" value="zh"> 中文
+            </label>
+          </div>
+          <div class="hint">选择生成简历的语言，「跟随 JD 语言」会自动匹配职位描述的语言</div>
+        </div>
       </div>
     </div>
 
@@ -757,6 +772,9 @@ function populate() {
   document.querySelector(`input[name="rg_mode"][value="${rgMode}"]`).checked = true;
   document.getElementById('rg_file_path').value = rgOutput.file_path || '~/.job-tracker/matched_jobs/';
   document.getElementById('rg_webhook_url').value = rgOutput.webhook_url || '';
+  const rgLang = rg.language || 'follow_jd';
+  const rgLangRadio = document.querySelector(`input[name="rg_language"][value="${rgLang}"]`);
+  if (rgLangRadio) rgLangRadio.checked = true;
 
   const st = config.storage;
   document.getElementById('local_path').value = st.local_path;
@@ -852,6 +870,7 @@ function collectConfig() {
     resume_generator: {
       enabled: document.getElementById('rg_enabled').checked,
       description: "将匹配职位实时输出给简历定制生成器，AI 根据职位 JD 和你的简历生成针对该职位的定制版简历",
+      language: document.querySelector('input[name="rg_language"]:checked')?.value || 'follow_jd',
       output: {
         mode: document.querySelector('input[name="rg_mode"]:checked').value,
         file_path: document.getElementById('rg_file_path').value,

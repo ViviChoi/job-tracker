@@ -95,11 +95,42 @@ def _safe_part(text: str, max_len: int) -> str:
     return cleaned[:max_len].strip().replace(" ", "_")
 
 
+def _md_to_docx_bytes(resume_md: str) -> bytes | None:
+    """将 Markdown 简历转为 docx 字节流，失败返回 None。"""
+    try:
+        import tempfile, os
+        from docx import Document
+        from docx.shared import Pt
+        doc = Document()
+        # Remove default empty paragraph
+        for para in doc.paragraphs:
+            p = para._element
+            p.getparent().remove(p)
+        for line in resume_md.splitlines():
+            if line.startswith("# "):
+                p = doc.add_heading(line[2:].strip(), level=1)
+            elif line.startswith("## "):
+                p = doc.add_heading(line[3:].strip(), level=2)
+            elif line.startswith("### "):
+                p = doc.add_heading(line[4:].strip(), level=3)
+            elif line.startswith("---"):
+                doc.add_paragraph("─" * 40)
+            else:
+                doc.add_paragraph(line)
+        tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+        tmp.close()
+        doc.save(tmp.name)
+        data = Path(tmp.name).read_bytes()
+        os.unlink(tmp.name)
+        return data
+    except Exception as e:
+        logger.warning(f"docx 转换失败，回退到 md：{e}")
+        return None
+
+
 def _send_resume_file(main_token: str, main_chat_id: str,
                       company: str, title: str, resume_md: str) -> None:
-    """发送简历文件，若配置了独立 resume_bot 则发到那里。"""
-    filename = f"resume_{_safe_part(company, 25)}_{_safe_part(title, 35)}.md"
-
+    """发送简历文件（docx 优先，失败回退 md），若配置了独立 resume_bot 则发到那里。"""
     config = load_config()
     rb = config.get("resume_bot", {})
     if rb.get("enabled") and rb.get("bot_token") and rb.get("chat_id"):
@@ -108,8 +139,21 @@ def _send_resume_file(main_token: str, main_chat_id: str,
         dest_token, dest_chat = main_token, main_chat_id
 
     caption = f"📄 <b>{title}</b>\n🏢 {company}"
-    _send_document(dest_token, dest_chat, filename, resume_md, caption=caption)
-    logger.info(f"简历文件已发送：{filename}")
+    base = f"resume_{_safe_part(company, 25)}_{_safe_part(title, 35)}"
+
+    docx_bytes = _md_to_docx_bytes(resume_md)
+    if docx_bytes:
+        requests.post(
+            f"https://api.telegram.org/bot{dest_token}/sendDocument",
+            data={"chat_id": dest_chat, "caption": caption, "parse_mode": "HTML"},
+            files={"document": (f"{base}.docx", docx_bytes,
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            timeout=30,
+        )
+        logger.info(f"简历文件已发送（docx）：{base}.docx")
+    else:
+        _send_document(dest_token, dest_chat, f"{base}.md", resume_md, caption=caption)
+        logger.info(f"简历文件已发送（md）：{base}.md")
 
 
 # ── Pending data helpers ──────────────────────────────────────
@@ -218,10 +262,11 @@ def _generate_resume(job: dict) -> dict:
         return {"success": False, "error": "无法获取职位 JD，请检查链接是否有效"}
 
     job_info = {k: job.get(k, "") for k in ("title", "company", "location", "link", "posted_at")}
+    language = load_config().get("resume_generator", {}).get("language", "follow_jd")
     try:
         res = requests.post(
             f"{_RESUME_GEN_URL}/api/generate",
-            json={"jd": description, "job_info": job_info},
+            json={"jd": description, "job_info": job_info, "language": language},
             timeout=180,
         )
         return res.json()

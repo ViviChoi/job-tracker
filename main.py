@@ -89,11 +89,10 @@ def run_cycle() -> None:
         if push:
             new_matched.append({"job": job, "score": score, "reason": reason, "mode": config["matching"]["mode"]})
 
-    if not new_matched:
+    if new_matched:
+        logger.info(f"本轮新匹配 {len(new_matched)} 条")
+    else:
         logger.info("本轮无新匹配职位")
-        return
-
-    logger.info(f"本轮新匹配 {len(new_matched)} 条")
 
     # Dispatch based on mode
     notification_mode = config["notification"].get("mode", "realtime")
@@ -103,19 +102,42 @@ def run_cycle() -> None:
             logger.info("免打扰时段，暂存职位等待推送")
             return
 
-        # Flush jobs held during previous quiet hours
+        # Flush pending jobs (including backlog from previous cycles), max 20 per cycle to avoid TG spam
+        FLUSH_BATCH_SIZE = 20
+        hours_old = config["search"].get("hours_old", 24)
+        new_matched_ids = {job_id(i["job"]["link"]) for i in new_matched}
         pending = get_pending_jobs()
+        now = datetime.utcnow()
+        fresh_pending = []
+        expired_ids = []
         for r in pending:
-            jid = r["id"]
-            if jid in [job_id(i["job"]["link"]) for i in new_matched]:
-                continue  # will be sent below
+            if r["id"] in new_matched_ids:
+                continue
+            if r.get("starred") or r.get("status", "new") != "new":
+                fresh_pending.append(r)  # user showed interest, keep regardless of age
+                continue
+            try:
+                created = datetime.fromisoformat(r["created_at"].replace("Z", ""))
+                if (now - created).total_seconds() / 3600 <= hours_old:
+                    fresh_pending.append(r)
+                else:
+                    expired_ids.append(r["id"])
+            except Exception:
+                fresh_pending.append(r)
+        if expired_ids:
+            logger.info(f"积压职位中 {len(expired_ids)} 条已超过 {hours_old}h，跳过推送，标记为已通知")
+            for eid in expired_ids:
+                mark_notified(eid)
+        if fresh_pending:
+            logger.info(f"积压待推送 {len(fresh_pending)} 条，本轮推送前 {min(len(fresh_pending), FLUSH_BATCH_SIZE)} 条")
+        for r in fresh_pending[:FLUSH_BATCH_SIZE]:
             try:
                 notify_job(
                     {"title": r["title"], "company": r["company"],
                      "location": r["location"], "link": r["link"]},
                     r["match_score"], r["match_reason"],
                 )
-                mark_notified(jid)
+                mark_notified(r["id"])
             except Exception as e:
                 logger.error(f"积压职位推送失败：{e}")
 
@@ -129,8 +151,27 @@ def run_cycle() -> None:
     else:
         # Scheduled mode: jobs stay pending, batch send at scheduled times
         if should_notify_now(config):
+            hours_old = config["search"].get("hours_old", 24)
             pending = get_pending_jobs()
-            if pending:
+            now = datetime.utcnow()
+            fresh, expired_ids = [], []
+            for r in pending:
+                if r.get("starred") or r.get("status", "new") != "new":
+                    fresh.append(r)  # user showed interest, keep regardless of age
+                    continue
+                try:
+                    created = datetime.fromisoformat(r["created_at"].replace("Z", ""))
+                    if (now - created).total_seconds() / 3600 <= hours_old:
+                        fresh.append(r)
+                    else:
+                        expired_ids.append(r["id"])
+                except Exception:
+                    fresh.append(r)
+            if expired_ids:
+                logger.info(f"批量推送：{len(expired_ids)} 条已超过 {hours_old}h，跳过")
+                for eid in expired_ids:
+                    mark_notified(eid)
+            if fresh:
                 batch = [
                     {
                         "job": {"title": r["title"], "company": r["company"],
@@ -139,11 +180,11 @@ def run_cycle() -> None:
                         "reason": r["match_reason"],
                         "mode": config["matching"]["mode"],
                     }
-                    for r in pending
+                    for r in fresh
                 ]
                 try:
                     notify_batch(batch)
-                    for r in pending:
+                    for r in fresh:
                         mark_notified(r["id"])
                 except Exception as e:
                     logger.error(f"批量推送失败：{e}")

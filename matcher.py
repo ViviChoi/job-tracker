@@ -233,6 +233,27 @@ def match_with_ai(job: dict, config: dict) -> Tuple[bool, str]:
 
 
 def _call_ai(provider: str, api_key: str, model: str, system: str, user_content: str) -> str:
+    import time
+
+    retries = 3
+    delays = [10, 30, 60]
+
+    for attempt in range(retries):
+        try:
+            return _call_ai_once(provider, api_key, model, system, user_content)
+        except Exception as e:
+            code = getattr(e, "status_code", None)
+            if code in (429, 529) and attempt < retries - 1:
+                wait = delays[attempt]
+                logger.warning(f"API 过载（{code}），{wait}s 后重试（第{attempt+1}次）")
+                time.sleep(wait)
+            else:
+                raise
+
+    raise RuntimeError("不应到达此处")
+
+
+def _call_ai_once(provider: str, api_key: str, model: str, system: str, user_content: str) -> str:
     if provider == "claude":
         import anthropic
         default_model = "claude-haiku-4-5-20251001"

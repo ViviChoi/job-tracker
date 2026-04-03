@@ -10,7 +10,7 @@ from scraper import scrape
 from matcher import should_push
 from storage import init_db, is_seen, save_job, get_pending_jobs, mark_notified, job_id
 from notifier import (
-    notify_job, notify_batch, notify_warning, notify_error, notify_recovered
+    notify_job, notify_warning, notify_error, notify_recovered
 )
 from scheduler import load_config, get_interval_seconds, should_notify_now, is_quiet_hours
 from telegram_poller import start_polling
@@ -172,22 +172,17 @@ def run_cycle() -> None:
                 for eid in expired_ids:
                     mark_notified(eid)
             if fresh:
-                batch = [
-                    {
-                        "job": {"title": r["title"], "company": r["company"],
-                                "location": r["location"], "link": r["link"]},
-                        "score": r["match_score"],
-                        "reason": r["match_reason"],
-                        "mode": config["matching"]["mode"],
-                    }
-                    for r in fresh
-                ]
-                try:
-                    notify_batch(batch)
-                    for r in fresh:
+                logger.info(f"批量推送 {len(fresh)} 条")
+                for r in fresh:
+                    try:
+                        notify_job(
+                            {"title": r["title"], "company": r["company"],
+                             "location": r["location"], "link": r["link"]},
+                            r["match_score"], r["match_reason"],
+                        )
                         mark_notified(r["id"])
-                except Exception as e:
-                    logger.error(f"批量推送失败：{e}")
+                    except Exception as e:
+                        logger.error(f"批量推送失败（{r['title']}）：{e}")
 
 
 def check_interval_warning(config: dict) -> None:

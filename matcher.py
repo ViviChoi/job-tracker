@@ -236,18 +236,18 @@ def _call_ai(provider: str, api_key: str, model: str, system: str, user_content:
     import time
 
     retries = 3
-    delays = [10, 30, 60]
+    delay = 300  # 5 分钟
 
     for attempt in range(retries):
         try:
             return _call_ai_once(provider, api_key, model, system, user_content)
         except Exception as e:
-            code = getattr(e, "status_code", None)
-            if code in (429, 529) and attempt < retries - 1:
-                wait = delays[attempt]
-                logger.warning(f"API 过载（{code}），{wait}s 后重试（第{attempt+1}次）")
-                time.sleep(wait)
+            if attempt < retries - 1:
+                logger.warning(f"AI 调用失败（第{attempt+1}次），{delay}s 后重试：{e}")
+                time.sleep(delay)
             else:
+                from notifier import notify_error
+                notify_error("AI 匹配连续失败 3 次，请重启 Job Tracker")
                 raise
 
     raise RuntimeError("不应到达此处")

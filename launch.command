@@ -45,12 +45,41 @@ fi
 if [ "$REBUILD" -eq 1 ]; then
   echo "首次启动，正在安装依赖..."
   "$PYTHON" -m venv .venv
-  source .venv/bin/activate
-  pip install -q -r requirements.txt
-  echo "安装完成"
-else
-  source .venv/bin/activate
 fi
 
+source .venv/bin/activate
+
+pip install -q -r requirements.txt
+
+# 二次核验关键包是否真的装上了
+MISSING_PKGS=""
+for pkg in jobspy flask requests gspread anthropic openai PyPDF2 docx; do
+  if ! .venv/bin/python -c "import $pkg" &>/dev/null; then
+    MISSING_PKGS="$MISSING_PKGS $pkg"
+  fi
+done
+
+if [ -n "$MISSING_PKGS" ]; then
+  echo ""
+  echo "⚠️  以下包安装后仍无法导入，正在重试：$MISSING_PKGS"
+  pip install -r requirements.txt
+  STILL_MISSING=""
+  for pkg in jobspy flask requests gspread anthropic openai PyPDF2 docx; do
+    if ! .venv/bin/python -c "import $pkg" &>/dev/null; then
+      STILL_MISSING="$STILL_MISSING $pkg"
+    fi
+  done
+  if [ -n "$STILL_MISSING" ]; then
+    echo ""
+    echo "❌ 以下包安装失败：$STILL_MISSING"
+    echo "   请检查网络后重试，或在终端手动运行："
+    echo "   cd \"$DIR\" && source .venv/bin/activate && pip install -r requirements.txt"
+    echo ""
+    read -p "按回车键退出..."
+    exit 1
+  fi
+fi
+
+echo "安装完成"
 echo "启动 Job Tracker 配置界面..."
-python3 setup.py
+.venv/bin/python setup.py

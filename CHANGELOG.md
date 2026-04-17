@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-04-17] 启动脚本依赖核验修复
+
+### Bug Fixes
+
+**启动脚本 (`Double Click to Start_Mac.command`, `launch.command`)**
+- `pip install -q` 静默模式下部分包装失败不报错，脚本误认为安装成功，实际运行时才抛 `ModuleNotFoundError`
+- `launch.command` 末尾用 `python3 setup.py` 而非 `.venv/bin/python`，可能绕过 venv 走到系统 Python
+
+### 修复
+- pip 装完后逐包 `import` 核验（jobspy、flask、requests、gspread、anthropic、openai、PyPDF2、docx）
+- 发现缺失自动重试，重试后仍失败明确报出包名并阻止启动
+- `launch.command` 改用 `.venv/bin/python setup.py`
+
+---
+
 ## [2026-03-30] 第二批
 
 ### Bug Fixes
